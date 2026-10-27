@@ -13,7 +13,7 @@ import sys
 import edge_tts
 
 VOICE = "th-TH-NiwatNeural"
-SPEEDS = {"": "+0%", "-slow": "-40%"}
+SPEEDS = {"": "-10%", "-slow": "-40%"}
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ID_RE = re.compile(r"^[a-z0-9-]{1,40}$")
 
