@@ -21,7 +21,9 @@ ID_RE = re.compile(r"^[a-z0-9-]{1,40}$")
 async def synth(text, rate, out):
     for attempt in range(5):
         try:
-            await edge_tts.Communicate(text, VOICE, rate=rate).save(str(out))
+            # Thai separates sentences with spaces; newlines make Niwat pause there
+            spoken = re.sub(r"\s+", "\n", text)
+            await edge_tts.Communicate(spoken, VOICE, rate=rate).save(str(out))
             if out.stat().st_size > 0:
                 return True
         except Exception as e:  # edge-tts sometimes returns no audio; retry
