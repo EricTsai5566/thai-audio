@@ -1,6 +1,6 @@
 # thai-audio
 
-尚霖每日泰文 email 用的泰文男聲音檔（Microsoft Edge TTS `th-TH-NiwatNeural`，用 [edge-tts](https://github.com/rany2/edge-tts) 產生）。
+尚霖每日泰文 email 用的泰文男聲音檔（Google Gemini TTS `gemini-3.8-flash-tts`，voice `Puck`；慢速版用 ffmpeg atempo 0.75 放慢）。2026-11-19 起取代 Niwat。
 
 - routine 把句子寫進 `requests/<name>.json`：`{"items": [{"id": "s1", "text": "..."}]}`
 - GitHub Actions 產生 `audio/<name>/<id>.mp3` 和 `<id>-slow.mp3`
