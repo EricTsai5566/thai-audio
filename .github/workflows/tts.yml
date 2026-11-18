@@ -4,6 +4,9 @@ on:
   push:
     paths: ["requests/**"]
   workflow_dispatch:
+  schedule:
+    # retry missing audio after the Gemini free-tier daily quota resets (~16:00 Taipei)
+    - cron: "20 8,14 * * *"
 
 permissions:
   contents: write
