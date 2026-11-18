@@ -1,7 +1,7 @@
 """Generate Thai audio for requests/*.json with Gemini TTS (voice Puck).
 
 Request format: {"items": [{"id": "s1", "text": "สวัสดีครับ"}, ...]}
-Output: audio/<request name>/<id>.mp3 (normal) and <id>-slow.mp3 (ffmpeg atempo).
+Output: audio/<request name>/<id>.mp3 (x0.9) and <id>-slow.mp3 (x0.7), slowed by ffmpeg atempo.
 Existing files are skipped, so re-running is cheap. Needs GEMINI_API_KEY and ffmpeg.
 """
 import base64
@@ -17,12 +17,9 @@ import urllib.request
 
 MODEL = "gemini-3.8-flash-tts"
 VOICE = "Puck"
-SLOW_TEMPO = 0.75
-STYLE = (
-    "Say the following Thai text in natural, conversational Bangkok Thai, "
-    "like a friendly Thai man talking to a friend. Clear and a little slower "
-    "than normal for a learner. Read only the text, nothing else:\n\n"
-)
+# Gemini reads any style prompt aloud, so send bare text and slow it with ffmpeg
+TEMPO = {"": 0.9, "-slow": 0.7}
+GAP = 25  # free tier allows only a few requests per minute
 MAX_CHARS = 1200  # longer texts are split at spaces and joined
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -43,13 +40,14 @@ def chunks(text):
 
 def tts(text):
     body = {
-        "contents": [{"parts": [{"text": STYLE + text}]}],
+        "contents": [{"parts": [{"text": text}]}],
         "generationConfig": {
             "responseModalities": ["AUDIO"],
             "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": VOICE}}},
         },
     }
-    for attempt in range(6):
+    for attempt in range(8):
+        time.sleep(GAP)
         try:
             req = urllib.request.Request(
                 URL, data=json.dumps(body).encode(),
@@ -59,21 +57,20 @@ def tts(text):
             if pcm:
                 return pcm
         except urllib.error.HTTPError as e:
-            print(f"  retry {attempt + 1}: HTTP {e.code} {e.read()[:200]!r}")
-            if e.code == 429:  # free-tier rate limit
-                time.sleep(30 * (attempt + 1))
-                continue
+            err = e.read().decode(errors="replace")
+            print(f"  retry {attempt + 1}: HTTP {e.code} {err[:300]}")
+            if "PerDay" in err:  # daily quota gone, retrying won't help
+                return None
         except Exception as e:  # empty candidates, timeouts
             print(f"  retry {attempt + 1}: {e}")
-        time.sleep(5 * (attempt + 1))
+        time.sleep(10 * attempt)
     return None
 
 
-def to_mp3(pcm, out, tempo=None):
-    cmd = ["ffmpeg", "-loglevel", "error", "-y", "-f", "s16le", "-ar", "24000", "-ac", "1", "-i", "-"]
-    if tempo:
-        cmd += ["-filter:a", f"atempo={tempo}"]
-    subprocess.run(cmd + ["-b:a", "64k", str(out)], input=pcm, check=True)
+def to_mp3(pcm, out, tempo):
+    cmd = ["ffmpeg", "-loglevel", "error", "-y", "-f", "s16le", "-ar", "24000", "-ac", "1", "-i", "-",
+           "-filter:a", f"atempo={tempo}", "-b:a", "64k", str(out)]
+    subprocess.run(cmd, input=pcm, check=True)
 
 
 def main():
@@ -88,8 +85,8 @@ def main():
             if not ID_RE.match(iid) or not text:
                 print(f"skip bad item in {req.name}: {item!r}")
                 continue
-            normal, slow = outdir / f"{iid}.mp3", outdir / f"{iid}-slow.mp3"
-            if all(p.exists() and p.stat().st_size > 0 for p in (normal, slow)):
+            outs = {sfx: outdir / f"{iid}{sfx}.mp3" for sfx in TEMPO}
+            if all(p.exists() and p.stat().st_size > 0 for p in outs.values()):
                 continue
             print(f"gen {name}/{iid}")
             pcm = b""
@@ -102,8 +99,8 @@ def main():
             if not pcm:
                 failed += 1
                 continue
-            to_mp3(pcm, normal)
-            to_mp3(pcm, slow, SLOW_TEMPO)
+            for sfx, out in outs.items():
+                to_mp3(pcm, out, TEMPO[sfx])
     if failed:
         print(f"{failed} items failed")
         sys.exit(1)
