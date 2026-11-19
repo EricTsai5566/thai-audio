@@ -1,7 +1,7 @@
 """Generate Thai audio for requests/*.json with Gemini TTS (voice Puck).
 
 Request format: {"items": [{"id": "s1", "text": "สวัสดีครับ"}, ...]}
-Output: audio/<request name>/<id>.mp3 (x0.9) and <id>-slow.mp3 (x0.7), slowed by ffmpeg atempo.
+Output: audio/<request name>/<id>.mp3 (x0.9) and <id>-slow.mp3 (x0.75), slowed by ffmpeg atempo.
 Existing files are skipped, so re-running is cheap. Needs GEMINI_API_KEY and ffmpeg.
 """
 import base64
@@ -18,7 +18,7 @@ import urllib.request
 MODEL = "gemini-3.8-flash-tts"
 VOICE = "Puck"
 # Gemini reads any style prompt aloud, so send bare text and slow it with ffmpeg
-TEMPO = {"": 0.9, "-slow": 0.7}
+TEMPO = {"": 0.9, "-slow": 0.75}
 GAP = 25  # free tier allows only a few requests per minute
 MAX_CHARS = 1200  # longer texts are split at spaces and joined
 URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
