@@ -19,7 +19,10 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
+      # latest main, not the pushed sha, so a queued run sees audio from the run before it
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -35,4 +38,4 @@ jobs:
           git add audio
           git diff --cached --quiet && exit 0
           git commit -m "audio: $(git log -1 --format=%s)"
-          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done
+          for i in 1 2 3; do git pull --rebase -q && git push && exit 0; git rebase --abort 2>/dev/null; sleep 5; done; exit 1

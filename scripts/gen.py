@@ -2,9 +2,10 @@
 
 Request format: {"items": [{"id": "s1", "text": "สวัสดีครับ"}, ...]}
 Output: audio/<request name>/<id>.mp3 (x0.9) and <id>-slow.mp3 (x0.75), slowed by ffmpeg atempo.
-Existing files are skipped, so re-running is cheap. Needs GEMINI_API_KEY and ffmpeg.
+Existing files are skipped unless the text changed (<id>.sha holds its hash), so re-running is cheap. Needs GEMINI_API_KEY and ffmpeg.
 """
 import base64
+import hashlib
 import json
 import os
 import pathlib
@@ -86,7 +87,11 @@ def main():
                 print(f"skip bad item in {req.name}: {item!r}")
                 continue
             outs = {sfx: outdir / f"{iid}{sfx}.mp3" for sfx in TEMPO}
-            if all(p.exists() and p.stat().st_size > 0 for p in outs.values()):
+            sha_file = outdir / f"{iid}.sha"
+            sha = hashlib.sha256(text.encode()).hexdigest()
+            # audio from before .sha files existed has no hash; keep it
+            stale = sha_file.exists() and sha_file.read_text().strip() != sha
+            if not stale and all(p.exists() and p.stat().st_size > 0 for p in outs.values()):
                 continue
             print(f"gen {name}/{iid}")
             pcm = b""
@@ -101,6 +106,7 @@ def main():
                 continue
             for sfx, out in outs.items():
                 to_mp3(pcm, out, TEMPO[sfx])
+            sha_file.write_text(sha)
     if failed:
         print(f"{failed} items failed")
         sys.exit(1)
